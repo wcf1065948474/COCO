@@ -77,7 +77,7 @@ class COCOGAN(object):
     def __init__(self,opt):
         self.opt = opt
         self.G = models.Generator(opt) if opt.withspectral else models.Generator_withoutspectral(opt)
-        self.D = models.Discriminator()
+        self.D = models.Discriminator(opt)
         self.Lsloss = torch.nn.MSELoss()
         self.optimizerG = torch.optim.Adam(self.G.parameters(),1e-4,(0,0.999))
         self.optimizerD = torch.optim.Adam(self.D.parameters(),4e-4,(0,0.999))

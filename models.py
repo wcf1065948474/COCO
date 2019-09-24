@@ -50,7 +50,7 @@ class Generator(nn.Module):
     )
   def forward(self,input,y):
     res = self.linear(input)
-    res = res.view(-1,opt.scale*16,2,2)
+    res = res.view(-1,self.opt.scale*16,2,2)
     res = self.grb1(res,y)
     res = self.grb2(res,y)
     res = self.grb3(res,y)
@@ -102,7 +102,7 @@ class Generator_withoutspectral(nn.Module):
     )
   def forward(self,input,y):
     res = self.linear(input)
-    res = res.view(-1,opt.scale*16,2,2)
+    res = res.view(-1,self.opt.scale*16,2,2)
     res = self.grb1(res,y)
     res = self.grb2(res,y)
     res = self.grb3(res,y)
@@ -138,7 +138,7 @@ class DiscriminatorResidualBlock(nn.Module):
     return branch+master
     
 class Discriminator(nn.Module):
-  def __init__(self):
+  def __init__(self,opt):
     super().__init__()
     self.drb1 = DiscriminatorResidualBlock(3,opt.scale)
     self.drb2 = DiscriminatorResidualBlock(opt.scale,opt.scale*2)
