@@ -1,0 +1,2 @@
+# COCO
+parallel,serial,full
