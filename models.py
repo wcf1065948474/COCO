@@ -70,7 +70,7 @@ class GeneratorResidualBlock_withoutspectral(nn.Module):
     self.conv2 = nn.Conv2d(output_channel,output_channel,3,padding=1)
     self.conv_branch = nn.Conv2d(input_channel,output_channel,3,padding=1)
     # self.cbn = ConditionalBatchNorm2d(output_channel)
-    self.cbn = GroupConditionalBatchNorm2d(opt,output_channel)
+    self.cbn = GCBN(opt,output_channel)
 
   def forward(self,input,y):
     master = self.relu1(input)
@@ -95,7 +95,7 @@ class Generator_withoutspectral(nn.Module):
     # self.grb4 = GeneratorResidualBlock(opt,64,32)
     self.model = nn.Sequential(
       # nn.BatchNorm2d(64),
-      GroupBatchNorm2d(opt,opt.scale*2),
+      GBN(opt,opt.scale*2),
       nn.ReLU(),
       nn.Conv2d(opt.scale*2,3,3,padding=1),
       nn.Tanh()
