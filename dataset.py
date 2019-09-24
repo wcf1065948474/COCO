@@ -16,15 +16,8 @@ class CelebaDataset_h5py(object):
         self.file = h5py.File(self.opt.datapath,'r',swmr=True)
         self.file_data = self.file['celeba']
     def __getitem__(self,index):
-        self.macro_patches = []
         img = self.file_data[index % self.opt.max_dataset,:,:,:]
         img = self.transform(img)
-        for i in range(self.wh):
-            i *= self.opt.micro_size
-            for j in range(self.wh):    
-                j *= self.opt.micro_size
-                patch = img[:,i:i+self.opt.macro_size,j:j+self.opt.macro_size]
-                self.macro_patches.append(patch)
-        return self.macro_patches
+        return img
     def __len__(self):
         return self.opt.max_dataset

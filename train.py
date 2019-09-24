@@ -171,7 +171,7 @@ class COCOGAN(object):
         self.macro_patches = self.macro_from_micro_parallel(micro_patches)
 
         #update D()
-        x = x.cuda()
+        # x = x.cuda()
         ebd_y = self.latent_ebdy_generator.get_ebdy(pos,'macro')
         ebd_y = ebd_y.cuda()
         self.D.zero_grad()
