@@ -7,19 +7,19 @@ import time
 import utility
 torch.backends.cudnn.benchmark = True
 
-def get_macro_from_full(img,pos):
-    macro_pos_list = [0,1,2,4,5,6,8,9,10]
-    macro_pos = macro_pos_list[pos]
-    i = macro_pos//4
-    j = macro_pos%4
-    fake_patch = img[:,:,i*self.opt.micro_size:i*self.opt.micro_size+self.opt.macro_size,j*self.opt.micro_size:j*self.opt.micro_size+self.opt.macro_size]
-    return fake_patch
-
 
 opt = option.Option()
 celeba_dataset = dataset.CelebaDataset_h5py(opt)
 dataloader = torch.utils.data.DataLoader(celeba_dataset,opt.batchsize,shuffle=True,num_workers=16,drop_last=True,pin_memory=True)
 gan = train.COCOGAN(opt)
+
+def get_macro_from_full(img,pos):
+    macro_pos_list = [0,1,2,4,5,6,8,9,10]
+    macro_pos = macro_pos_list[pos]
+    i = macro_pos//4
+    j = macro_pos%4
+    fake_patch = img[:,:,i*opt.micro_size:i*opt.micro_size+opt.macro_size,j*opt.micro_size:j*opt.micro_size+opt.macro_size]
+    return fake_patch
 
 @utility.autotrain()
 def train_net(gan,dataloader):
