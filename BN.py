@@ -109,7 +109,7 @@ class GCBN(_GBN):
         delta_beta = self.beta_mlp(y)
         
         gamma_cloned = self.weight.clone()
-        beta_cloned = self.beta.clone()
+        beta_cloned = self.bias.clone()
         gamma_cloned = gamma_cloned.view(1,C).expand(N,C)
         beta_cloned = beta_cloned.view(1,C).expand(N,C)
 
