@@ -4,7 +4,7 @@ from torch.nn.parameter import Parameter
 import torch.nn.init as init
 
 class _GBN(nn.Module):
-    __constants__ = ['track_running_stats', 'momentum', 'eps', 'weight', 'beta',
+    __constants__ = ['track_running_stats', 'momentum', 'eps', 'weight', 'bias',
                      'running_mean', 'running_var', 'num_batches_tracked',
                      'num_features', 'affine']
 
@@ -19,10 +19,10 @@ class _GBN(nn.Module):
         self.track_running_stats = track_running_stats
         if self.affine:
             self.weight = Parameter(torch.Tensor(num_features))
-            self.beta = Parameter(torch.Tensor(num_features))
+            self.bias = Parameter(torch.Tensor(num_features))
         else:
             self.register_parameter('weight', None)
-            self.register_parameter('beta', None)
+            self.register_parameter('bias', None)
         if self.track_running_stats:
             self.running_mean = Parameter(torch.Tensor(self.opt.micro_in_macro,1,num_features,1,1), requires_grad = False)
             self.running_var = Parameter(torch.Tensor(self.opt.micro_in_macro,1,num_features,1,1), requires_grad = False)
@@ -40,7 +40,7 @@ class _GBN(nn.Module):
         self.reset_running_stats()
         if self.affine:
             init.ones_(self.weight)
-            init.zeros_(self.beta)
+            init.zeros_(self.bias)
 
     def _check_input_dim(self, input):
         raise NotImplementedError
@@ -48,7 +48,7 @@ class _GBN(nn.Module):
     def forward(self, input):
         self._check_input_dim(input)
         N,C,_,_ = input.size()
-        output,running_mean,running_var = self.g_b_n(input,self.running_mean,self.running_var,self.weight.expand(N,C),self.beta.expand(N,C))
+        output,running_mean,running_var = self.g_b_n(input,self.running_mean,self.running_var,self.weight.expand(N,C),self.bias.expand(N,C))
         if self.training:
             self.running_mean.data = running_mean.data
             self.running_var.data = running_var.data
@@ -126,3 +126,42 @@ class GCBN(_GBN):
             raise ValueError('expected 4D input (got {}D input)'
                              .format(input.dim()))
 
+class CBN(nn.Module):
+    def __init__(self,opt,num_features,eps=1e-5):
+        super(CBN,self).__init__()
+        self.num_features = num_features
+        inter_dim = 2*num_features
+        self.eps = eps
+        self.gamma_mlp = nn.Sequential(
+            nn.Linear(128,inter_dim),
+            nn.ReLU(),
+            nn.Linear(inter_dim,num_features)
+        )
+        self.beta_mlp = nn.Sequential(
+            nn.Linear(128,inter_dim),
+            nn.ReLU(),
+            nn.Linear(inter_dim,num_features)
+        )
+
+        # self.weight = Parameter(torch.Tensor(num_features))
+        # self.bias = Parameter(torch.Tensor(num_features))
+
+        self.running_mean = Parameter(torch.Tensor(1,num_features,1,1), requires_grad = False)
+        self.running_var = Parameter(torch.Tensor(1,num_features,1,1), requires_grad = False)
+        self.running_mean.zero_()
+        self.running_var.fill_(1)
+
+    def forward(self,x,y):
+        N,C,H,W = x.size()
+        x_mean = torch.mean(x,(0,2,3),keepdim=True)
+        x_var = torch.var(x,(0,2,3),keepdim=True)
+        gamma = self.gamma_mlp(y)
+        beta = self.bata_mlp(y)
+        if self.training:
+            self.running_mean = 0.99*self.running_mean+0.01*x_mean
+            self.running_var = 0.99*self.running_var+0.01*x_var
+            X_hat = (x-x_mean)/torch.sqrt(x_var+self.eps)
+        else:
+            X_hat = (x-self.running_mean)/torch.sqrt(self.running_var+self.eps)
+        out = X_hat*gamma.view(N,C,1,1)+beta.view(N,C,1,1)
+        return out

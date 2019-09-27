@@ -20,3 +20,7 @@ class Option(object):
         self.my_model_dir = 'my_model'
         self.showgrad = False
         self.withspectral = False
+        self.g_lr = 1e-4
+        self.d_lr = 4e-4
+        self.g_betas = (0.9,0.999)
+        self.d_betas = (0.9,0.999)

@@ -79,8 +79,8 @@ class COCOGAN(object):
         self.G = models.Generator(opt) if opt.withspectral else models.Generator_withoutspectral(opt)
         self.D = models.Discriminator(opt)
         self.Lsloss = torch.nn.MSELoss()
-        self.optimizerG = torch.optim.Adam(self.G.parameters(),1e-4,(0,0.999))
-        self.optimizerD = torch.optim.Adam(self.D.parameters(),4e-4,(0,0.999))
+        self.optimizerG = torch.optim.Adam(self.G.parameters(),opt.g_lr,opt.g_betas)
+        self.optimizerD = torch.optim.Adam(self.D.parameters(),opt.d_lr,opt.d_betas)
         self.d_losses = []
         self.g_losses = []
         self.G.cuda()
@@ -93,10 +93,10 @@ class COCOGAN(object):
         if classname.find('Conv') != -1:
             nn.init.normal_(m.weight.data, 0.0, 0.02)
         elif classname.find('BatchNorm') != -1:
-            if classname.find('Conditional') == -1:
-                if m.weight is not None:
-                    nn.init.normal_(m.weight.data, 1.0, 0.02)
-                    nn.init.constant_(m.bias.data, 0)
+            # if classname.find('Conditional') == -1:
+            if m.weight is not None:
+                nn.init.normal_(m.weight.data, 1.0, 0.02)
+                nn.init.constant_(m.bias.data, 0)
 
     def macro_from_micro_parallel(self,micro):
         macrolist = []
@@ -146,10 +146,10 @@ class COCOGAN(object):
         ebd_y = ebd_y.cuda()
         self.D.zero_grad()
         self.macro_data = self.macro_patches.detach()
-        fakeD,_ = self.D(self.macro_data,ebd_y)#y有问题！
+        fakeD,fakeDH = self.D(self.macro_data,ebd_y)#y有问题！
         realD,realDH = self.D(x,ebd_y)#y有问题！
         gradient_penalty = self.calc_gradient_penalty(x,self.macro_data,ebd_y)
-        d_loss = fakeD.mean()-realD.mean()+gradient_penalty+self.opt.ALPHA*self.Lsloss(realDH,ebd_y)
+        d_loss = fakeD.mean()-realD.mean()+gradient_penalty+self.opt.ALPHA*self.Lsloss(realDH,ebd_y)+self.opt.ALPHA*self.Lsloss(fakeDH,ebd_y)
         d_loss.backward()
         if self.opt.showgrad:
             plot_grad_flow(self.D.named_parameters())
@@ -176,10 +176,10 @@ class COCOGAN(object):
         ebd_y = ebd_y.cuda()
         self.D.zero_grad()
         self.macro_data = self.macro_patches.detach()
-        fakeD,_ = self.D(self.macro_data,ebd_y)#y有问题！
+        fakeD,fakeDH = self.D(self.macro_data,ebd_y)#y有问题！
         realD,realDH = self.D(x,ebd_y)#y有问题！
         gradient_penalty = self.calc_gradient_penalty(x,self.macro_data,ebd_y)
-        d_loss = fakeD.mean()-realD.mean()+gradient_penalty+self.opt.ALPHA*self.Lsloss(realDH,ebd_y)
+        d_loss = fakeD.mean()-realD.mean()+gradient_penalty+self.opt.ALPHA*self.Lsloss(realDH,ebd_y)+self.opt.ALPHA*self.Lsloss(fakeDH,ebd_y)
         d_loss.backward()
         if self.opt.showgrad:
             plot_grad_flow(self.D.named_parameters())

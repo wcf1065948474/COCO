@@ -4,7 +4,7 @@ import numpy as np
 import option
 import time
 import matplotlib.pyplot as plt
-from GBN import GBN,GCBN
+from BN import GBN,GCBN
 
 
 class GeneratorResidualBlock(nn.Module):
