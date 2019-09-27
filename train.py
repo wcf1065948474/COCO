@@ -51,7 +51,8 @@ class Get_Latent_Y(object):
         self.macro_table = self.macro_table.contiguous().view(-1)
 
     def get_latent(self):
-        self.z = np.random.normal(0.0,1.0,(self.opt.batchsize,126)).astype(np.float32)
+        # self.z = np.random.normal(0.0,1.0,(self.opt.batchsize,126)).astype(np.float32)
+        self.z = np.random.uniform(-1.,1.,(self.opt.batchsize,126)).astype(np.float32)
         self.z = np.tile(self.z,(self.opt.micro_in_macro,1))
         self.z = torch.from_numpy(self.z)
 
@@ -196,7 +197,8 @@ class COCOGAN(object):
         self.g_losses.append(g_loss.item())
 
     def generate_serial(self):
-        z = np.random.normal(0.0,1.0,(self.opt.batchsize,126)).astype(np.float32)
+        # z = np.random.normal(0.0,1.0,(self.opt.batchsize,126)).astype(np.float32)
+        z = np.random.uniform(-1.,1.,(self.opt.batchsize,126)).astype(np.float32)
         z = torch.from_numpy(z)
         ebdy = torch.transpose(self.latent_ebdy_generator.ebd,0,1)
         micro_list = []

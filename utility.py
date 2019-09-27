@@ -15,6 +15,7 @@ def autotrain(start_epoch = 0,max_time = 3600*9):
                 res = func(net,dataloader)
                 epochtime = time.time()-starttime
                 rest_time -= epochtime
+                print('epochtime:{},epoch:{}'.format(epochtime,start_epoch))
                 start_epoch += 1
                 if epochtime > max_epochtime:
                     max_epochtime = epochtime
