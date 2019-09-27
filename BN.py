@@ -108,14 +108,14 @@ class GCBN(_GBN):
         delta_gamma = self.gamma_mlp(y)
         delta_beta = self.beta_mlp(y)
         
-        gamma_cloned = self.weight.clone()
-        beta_cloned = self.bias.clone()
-        gamma_cloned = gamma_cloned.view(1,C).expand(N,C)
-        beta_cloned = beta_cloned.view(1,C).expand(N,C)
+        # gamma_cloned = self.weight.clone()
+        # beta_cloned = self.bias.clone()
+        # gamma_cloned = gamma_cloned.view(1,C).expand(N,C)
+        # beta_cloned = beta_cloned.view(1,C).expand(N,C)
 
-        gamma_cloned = gamma_cloned + delta_gamma
-        beta_cloned = beta_cloned + delta_beta
-        output,running_mean,running_var = self.g_b_n(input,self.running_mean,self.running_var,gamma_cloned,beta_cloned)
+        # gamma_cloned = gamma_cloned + delta_gamma
+        # beta_cloned = beta_cloned + delta_beta
+        output,running_mean,running_var = self.g_b_n(input,self.running_mean,self.running_var,delta_gamma,delta_beta)
         if self.training:
             self.running_mean.data = running_mean.data
             self.running_var.data = running_var.data
