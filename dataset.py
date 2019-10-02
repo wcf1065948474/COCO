@@ -1,7 +1,4 @@
-import torch
-import os
 import torchvision.transforms as transforms
-from PIL import Image
 import h5py
 
 class CelebaDataset_h5py(object):

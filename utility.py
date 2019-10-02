@@ -16,12 +16,12 @@ def autotrain(start_epoch = 0,max_time = 3600*9):
                 epochtime = time.time()-starttime
                 rest_time -= epochtime
                 print('epochtime:{},epoch:{}'.format(epochtime,start_epoch))
-                start_epoch += 1
                 if epochtime > max_epochtime:
                     max_epochtime = epochtime
                 if rest_time < max_epochtime:
+                    net.save_network(start_epoch)
                     break
-            net.save_network(start_epoch)
+                start_epoch += 1
             return res
         return wrapper
     return decorator
