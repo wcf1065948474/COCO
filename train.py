@@ -5,13 +5,11 @@ import models
 import os
 import numpy as np
 import matplotlib.pyplot as plt
-from matplotlib.lines import Line2D
+from PIL import Image
 
 def tensor2im(image_tensor, imtype=np.uint8):
-    image_numpy = image_tensor[0].cpu().float().numpy()
-    image_numpy = (np.transpose(image_numpy, (1, 2, 0)) + 1) / 2.0 * 255.0
-    # image_numpy = (image_numpy-np.min(image_numpy))/(np.max(image_numpy)-np.min(image_numpy))
-    # image_numpy *= 255.0
+    image_numpy = image_tensor.cpu().float().numpy()
+    image_numpy = (np.transpose(image_numpy, (0,2,3,1)) + 1) / 2.0 * 255.0
     image_numpy = np.maximum(image_numpy, 0)
     image_numpy = np.minimum(image_numpy, 255)
     return image_numpy.astype(imtype)
@@ -89,6 +87,8 @@ class COCOGAN(object):
         self.G.apply(self.weights_init)
         self.D.apply(self.weights_init)
         self.latent_ebdy_generator = Get_Latent_Y(opt)
+
+        self.generate_imgs_count = 0
     def weights_init(self,m):
         classname = m.__class__.__name__
         if classname.find('Conv') != -1:
@@ -219,7 +219,7 @@ class COCOGAN(object):
         plt.imshow(full_img)
         plt.show()
     
-    def generate_parallel(self):
+    def generate_parallel(self,save_imgs = False):
         pos_list = [0,2,6,8]
         self.latent_ebdy_generator.get_latent()
         macro_patches_list = []
@@ -235,10 +235,16 @@ class COCOGAN(object):
             tmp_list.append(torch.cat(macro_patches_list[i*hw:i*hw+hw],3))
         full_img = torch.cat(tmp_list,2)
         full_img = tensor2im(full_img)
-        plt.figure(figsize=(2,2))
-        plt.axis('off')
-        plt.imshow(full_img)
-        plt.show()
+        if save_imgs:
+            self.generate_imgs_count += 1
+            for i in range(self.opt.batchsize):
+                img = Image.fromarray(full_img[i])
+                img.save("{}.jpeg".format(self.generate_imgs_count))
+        else:
+            plt.figure(figsize=(2,2))
+            plt.axis('off')
+            plt.imshow(full_img[0])
+            plt.show()
 
     
 
