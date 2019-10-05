@@ -239,7 +239,7 @@ class COCOGAN(object):
             self.generate_imgs_count += 1
             for i in range(self.opt.batchsize):
                 img = Image.fromarray(full_img[i])
-                img.save("{}.jpeg".format(self.generate_imgs_count))
+                img.save("gen_img//{}.jpeg".format(self.generate_imgs_count))
         else:
             plt.figure(figsize=(2,2))
             plt.axis('off')
