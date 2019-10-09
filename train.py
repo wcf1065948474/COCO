@@ -83,9 +83,10 @@ class COCOGAN(object):
         self.optimizerG = torch.optim.Adam(self.G.parameters(),opt.g_lr,opt.g_betas)
         self.optimizerD = torch.optim.Adam(self.D.parameters(),opt.d_lr,opt.d_betas)
         self.d_losses = []
+        self.wd_losses = []
         self.g_losses = []
-        self.epoch_d_losses = []
-        self.epoch_g_losses = []
+        self.wg_losses = []
+        self.losses = {'d':[],'g':[],'wd':[],'wg':[]}
         self.G.cuda()
         self.D.cuda()
         self.G.apply(self.weights_init)
@@ -184,23 +185,25 @@ class COCOGAN(object):
         fakeD,fakeDH = self.D(self.macro_data,ebd_y)#y有问题！
         realD,realDH = self.D(x,ebd_y)#y有问题！
         gradient_penalty = self.calc_gradient_penalty(x,self.macro_data,ebd_y)
-        d_wloss = fakeD.mean()-realD.mean()
-        d_loss = d_wloss+gradient_penalty+self.opt.ALPHA*self.Lsloss(realDH,ebd_y)+self.opt.ALPHA*self.Lsloss(fakeDH,ebd_y)
+        wd_loss = fakeD.mean()-realD.mean()
+        d_loss = wd_loss+gradient_penalty+self.opt.ALPHA*self.Lsloss(realDH,ebd_y)+self.opt.ALPHA*self.Lsloss(fakeDH,ebd_y)
         d_loss.backward()
         if self.opt.showgrad:
             plot_grad_flow(self.D.named_parameters())
         self.optimizerD.step()
-        self.d_losses.append(d_wloss.item())
+        self.wd_losses.append(wd_loss.item())
+        self.d_losses.append(d_loss.item())
         #update G()
         self.G.zero_grad()
         realG,realGH = self.D(self.macro_patches,ebd_y)#y有问题!
-        g_wloss = -realG.mean()
-        g_loss = g_wloss+self.opt.ALPHA*self.Lsloss(realGH,ebd_y)
+        wg_loss = -realG.mean()
+        g_loss = wg_loss+self.opt.ALPHA*self.Lsloss(realGH,ebd_y)
         g_loss.backward()
         if self.opt.showgrad:
             plot_grad_flow(self.G.named_parameters())
         self.optimizerG.step()
-        self.g_losses.append(g_wloss.item())
+        self.wg_losses.append(wg_loss.item())
+        self.g_losses.append(g_loss.item())
 
     def generate_serial(self):
         # z = np.random.normal(0.0,1.0,(self.opt.batchsize,126)).astype(np.float32)
@@ -261,14 +264,11 @@ class COCOGAN(object):
         save_filename = "%s_netD.pth"%epoch_label
         save_path = os.path.join(self.opt.my_model_dir,save_filename)
         torch.save(self.D.state_dict(),save_path)
-        save_filename = "%s_g_losses"%epoch_label
+        save_filename = "%s_losses"%epoch_label
         save_path = os.path.join(self.opt.my_model_dir,save_filename)
         with open(save_path,'wb') as f:
-            pickle.dump(self.epoch_g_losses,f)
-        save_filename = "%s_d_losses"%epoch_label
-        save_path = os.path.join(self.opt.my_model_dir,save_filename)
-        with open(save_path,'wb') as f:
-            pickle.dump(self.epoch_d_losses,f)
+            pickle.dump(self.losses,f)
+
     def load_network(self,epoch_label):
         filename = "%s_netG.pth"%epoch_label
         filepath = os.path.join(self.opt.my_model_dir,filename)
@@ -276,14 +276,11 @@ class COCOGAN(object):
         filename = "%s_netD.pth"%epoch_label
         filepath = os.path.join(self.opt.my_model_dir,filename)
         self.D.load_state_dict(torch.load(filepath))
-        filename = "%s_g_losses"%epoch_label
+        filename = "%s_losses"%epoch_label
         filepath = os.path.join(self.opt.my_model_dir,filename)
         with open(filepath,'rb') as f:
-            self.epoch_g_losses = pickle.load(f)
-        filename = "%s_d_losses"%epoch_label
-        filepath = os.path.join(self.opt.my_model_dir,filename)
-        with open(filepath,'rb') as f:
-            self.epoch_d_losses = pickle.load(f)
+            self.losses = pickle.load(f)
+
     def update_learning_rate(self):
         for param_group in self.optimizerD.param_groups:
             param_group['lr'] = param_group['lr']*0.9
@@ -291,10 +288,16 @@ class COCOGAN(object):
             param_group['lr'] = param_group['lr']*0.9
   
     def show_loss(self):
-        avg_d_loss = sum(self.d_losses)/len(self.d_losses)
-        avg_g_loss = sum(self.g_losses)/len(self.g_losses)
-        print("d_loss={},g_loss={}".format(avg_d_loss,avg_g_loss))
-        self.epoch_d_losses.append(avg_d_loss)
-        self.epoch_g_losses.append(avg_g_loss)
+        avg_d_loss = np.mean(self.d_losses)
+        avg_g_loss = np.mean(self.g_losses)
+        avg_wd_loss = np.mean(self.wd_losses)
+        avg_wg_loss = np.mean(self.wg_losses)
+        print("d_loss={},g_loss={},wd_loss={},wg_loss={}".format(avg_d_loss,avg_g_loss,avg_wd_loss,avg_wg_loss))
+        self.losses['d'].append(avg_d_loss)
+        self.losses['g'].append(avg_g_loss)
+        self.losses['wd'].append(avg_wd_loss)
+        self.losses['wg'].append(avg_wg_loss)
         self.d_losses = []
-        self.g_losses = []      
+        self.g_losses = []
+        self.wd_losses = []
+        self.wg_losses = []      
