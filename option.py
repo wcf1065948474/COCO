@@ -22,5 +22,5 @@ class Option(object):
         self.withspectral = True
         self.g_lr = 1e-4
         self.d_lr = 4e-4
-        self.g_betas = (0.0,0.999)
-        self.d_betas = (0.0,0.999)
+        self.g_betas = (0.5,0.999)
+        self.d_betas = (0.5,0.999)
