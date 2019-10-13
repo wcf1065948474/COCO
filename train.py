@@ -245,13 +245,19 @@ class COCOGAN(object):
         full_img = torch.cat(tmp_list,2)
         full_img = tensor2im(full_img)
         if save_imgs:
-            self.generate_imgs_count += 1
             for i in range(self.opt.batchsize):
+                self.generate_imgs_count += 1
                 img = Image.fromarray(full_img[i])
-                img.save("gen_img//{}.jpeg".format(self.generate_imgs_count))
+                img.save("gen_img//{}.jpg".format(self.generate_imgs_count))
         else:
-            plt.figure(figsize=(2,2))
+            hwlist = []
+            plt.figure(figsize=(6,6))
             plt.axis('off')
+            full_img = full_img[:16]
+            imglist = np.split(full_img,full_img.shape[0])
+            for i in range(4):
+                hwlist.append(np.concatenate(imglist[i*4:i*4+4],2))
+            full_img = np.concatenate(hwlist,1)
             plt.imshow(full_img[0])
             plt.show()
 

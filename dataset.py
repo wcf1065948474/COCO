@@ -4,7 +4,6 @@ import h5py
 class CelebaDataset_h5py(object):
     def __init__(self,opt):
         self.opt = opt
-        self.wh = int(opt.full_size/opt.micro_size)-1
         self.transform = transforms.Compose(
             [transforms.ToTensor(),
             transforms.Normalize((0.5, 0.5, 0.5),
