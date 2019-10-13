@@ -2,16 +2,19 @@
 
 import os
 import glob
-#os.environ['CUDA_VISIBLE_DEVICES'] = '2'
+os.environ['CUDA_VISIBLE_DEVICES'] = '0'
 import numpy as np
 import fid
 from scipy.misc import imread
 import tensorflow as tf
+import h5py
+import ../option
 
 ########
 # PATHS
 ########
-data_path = 'data' # set path to training set images
+opt = option.Option()
+data_path = 'celeba_img.h5py' # set path to training set images
 output_path = 'fid_stats.npz' # path for where to store the statistics
 # if you have downloaded and extracted
 #   http://download.tensorflow.org/models/image/imagenet/inception-2015-12-05.tgz
@@ -24,8 +27,12 @@ print("ok")
 
 # loads all images into memory (this might require a lot of RAM!)
 print("load images..", end=" " , flush=True)
-image_list = glob.glob(os.path.join(data_path, '*.jpg'))
-images = np.array([imread(str(fn)).astype(np.float32) for fn in image_list])
+# image_list = glob.glob(os.path.join(data_path, '*.jpg'))
+filedata = h5py.File(data_path,'r')
+filedata = filedata['celeba']
+filedata = filedata[:opt.max_dataset]
+image_list = np.split(filedata,filedata.shape[0])
+images = np.array([fn[0].astype(np.float32) for fn in image_list])
 print("%d images found and loaded" % len(images))
 
 print("create inception graph..", end=" ", flush=True)
