@@ -255,7 +255,8 @@ class COCOGAN(object):
                 imgs.append(self.get_array_parallel())
             full_img = np.concatenate(imgs,0)
             full_img = full_img[:50000]
-            print(fid.calculate_fid_fromarray(full_img))
+            with open('imgs','wb') as f:
+                pickle.dump(full_img,f)
         else:
             full_img = self.get_array_parallel()
 

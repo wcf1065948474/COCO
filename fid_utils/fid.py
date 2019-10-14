@@ -343,3 +343,7 @@ def calculate_fid_fromarray(array):
 #     os.environ['CUDA_VISIBLE_DEVICES'] = args.gpu
 #     fid_value = calculate_fid_given_paths(args.path, args.inception, low_profile=args.lowprofile)
 #     print("FID: ", fid_value)
+if __name__ == "__main__":
+    with open('imgs','rb') as f:
+        x = pickle.load(f)
+    print(calculate_fid_fromarray(x))
