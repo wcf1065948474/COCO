@@ -21,11 +21,12 @@ import numpy as np
 import os
 import gzip, pickle
 import tensorflow as tf
-from scipy.misc import imread
 from scipy import linalg
 import pathlib
 import urllib
 import warnings
+
+os.environ['CUDA_VISIBLE_DEVICES'] = '0'
 
 class InvalidFIDException(Exception):
     pass
@@ -291,6 +292,11 @@ def _handle_path(path, sess, low_profile=False):
             del x #clean up memory
     return m, s
 
+def handle_array(array,sess):
+    x = array.astype(np.float32)
+    m,s = calculate_activation_statistics(x,sess)
+    del x
+    return m,s
 
 def calculate_fid_given_paths(paths, inception_path, low_profile=False):
     ''' Calculates the FID of two paths. '''
@@ -309,18 +315,31 @@ def calculate_fid_given_paths(paths, inception_path, low_profile=False):
         return fid_value
 
 
-if __name__ == "__main__":
-    from argparse import ArgumentParser, ArgumentDefaultsHelpFormatter
-    parser = ArgumentParser(formatter_class=ArgumentDefaultsHelpFormatter)
-    parser.add_argument("path", type=str, nargs=2,
-        help='Path to the generated images or to .npz statistic files')
-    parser.add_argument("-i", "--inception", type=str, default=None,
-        help='Path to Inception model (will be downloaded if not provided)')
-    parser.add_argument("--gpu", default="0", type=str,
-        help='GPU to use (leave blank for CPU only)')
-    parser.add_argument("--lowprofile", action="store_true",
-        help='Keep only one batch of images in memory at a time. This reduces memory footprint, but may decrease speed slightly.')
-    args = parser.parse_args()
-    os.environ['CUDA_VISIBLE_DEVICES'] = args.gpu
-    fid_value = calculate_fid_given_paths(args.path, args.inception, low_profile=args.lowprofile)
-    print("FID: ", fid_value)
+def calculate_fid_fromarray(array):
+    inception_path = check_or_download_inception(None)
+    create_inception_graph(str(inception_path))
+    with tf.Session() as sess:
+        sess.run(tf.global_variables_initializer())
+        f = np.load('fid_stats.npz')
+        m1, s1 = f['mu'][:], f['sigma'][:]
+        f.close()
+
+        m2, s2 = handle_array(array, sess)
+        fid_value = calculate_frechet_distance(m1, s1, m2, s2)
+        return fid_value
+
+# if __name__ == "__main__":
+#     from argparse import ArgumentParser, ArgumentDefaultsHelpFormatter
+#     parser = ArgumentParser(formatter_class=ArgumentDefaultsHelpFormatter)
+#     parser.add_argument("path", type=str, nargs=2,
+#         help='Path to the generated images or to .npz statistic files')
+#     parser.add_argument("-i", "--inception", type=str, default=None,
+#         help='Path to Inception model (will be downloaded if not provided)')
+#     parser.add_argument("--gpu", default="0", type=str,
+#         help='GPU to use (leave blank for CPU only)')
+#     parser.add_argument("--lowprofile", action="store_true",
+#         help='Keep only one batch of images in memory at a time. This reduces memory footprint, but may decrease speed slightly.')
+#     args = parser.parse_args()
+#     os.environ['CUDA_VISIBLE_DEVICES'] = args.gpu
+#     fid_value = calculate_fid_given_paths(args.path, args.inception, low_profile=args.lowprofile)
+#     print("FID: ", fid_value)
