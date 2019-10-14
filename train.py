@@ -7,6 +7,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import pickle
 from PIL import Image
+import fid_utils.fid as fid
 
 
 def tensor2im(image_tensor, imtype=np.uint8):
@@ -228,7 +229,8 @@ class COCOGAN(object):
         plt.imshow(full_img)
         plt.show()
     
-    def generate_parallel(self,save_imgs = False):
+
+    def get_array_parallel(self):
         pos_list = [0,2,6,8]
         self.latent_ebdy_generator.get_latent()
         macro_patches_list = []
@@ -244,6 +246,19 @@ class COCOGAN(object):
             tmp_list.append(torch.cat(macro_patches_list[i*hw:i*hw+hw],3))
         full_img = torch.cat(tmp_list,2)
         full_img = tensor2im(full_img)
+        return full_img
+
+    def generate_parallel(self,calc_fid = False,save_imgs = False):
+        if calc_fid:
+            imgs = []
+            for i in range(100):
+                imgs.append(self.get_array_parallel())
+            full_img = np.concatenate(imgs,0)
+            full_img = full_img[:50000]
+            print(fid.calculate_fid_fromarray(full_img))
+        else:
+            full_img = self.get_array_parallel()
+
         if save_imgs:
             for i in range(self.opt.batchsize):
                 self.generate_imgs_count += 1
