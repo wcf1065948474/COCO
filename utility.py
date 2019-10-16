@@ -1,6 +1,6 @@
 import time
 
-def autotrain(start_epoch = 0,max_time = 3600*9):
+def autotrain(start_epoch = 0,max_time = 3600*9,save_each_epoch = False):
     def decorator(func):
         max_epochtime = 0
         rest_time = max_time
@@ -21,6 +21,8 @@ def autotrain(start_epoch = 0,max_time = 3600*9):
                 if rest_time < max_epochtime:
                     net.save_network(start_epoch)
                     break
+                if save_each_epoch:
+                    net.save_network(start_epoch)
                 start_epoch += 1
             return res
         return wrapper
