@@ -1,5 +1,6 @@
 import torch
 import torch.nn as nn
+import random
 import option
 import models
 import os
@@ -171,6 +172,17 @@ class COCOGAN(object):
             plot_grad_flow(self.G.named_parameters())
         self.optimizerG.step()
         self.g_losses.append(g_loss.item())
+
+    def swap_imgs(self,real_imgs,fake_imgs,uratio=0.3,ratio=0.1):
+        up = random.uniform(0,1)
+        if up <= uratio:
+            for idx in range(self.opt.batchsize):
+                p = random.uniform(0, 1)
+                if p <= ratio:
+                    tmp = real_imgs[idx].clone()
+                    real_imgs[idx] = fake_imgs[idx].clone()
+                    fake_imgs[idx] = tmp
+
     def train_parallel(self,x,pos):
         latent_ebdy,_ = self.latent_ebdy_generator.get_latent_ebdy(pos)
         latent_ebdy = latent_ebdy.cuda()
@@ -182,9 +194,10 @@ class COCOGAN(object):
         ebd_y = self.latent_ebdy_generator.get_ebdy(pos,'macro')
         ebd_y = ebd_y.cuda()
         self.D.zero_grad()
-        self.macro_data = self.macro_patches.detach()
-        fakeD,fakeDH = self.D(self.macro_data,ebd_y)#y有问题！
-        realD,realDH = self.D(x,ebd_y)#y有问题！
+        self.macro_data = self.macro_patches.detach().clone()
+        # self.swap_imgs(x,self.macro_data)
+        fakeD,fakeDH = self.D(self.macro_data,ebd_y)
+        realD,realDH = self.D(x,ebd_y)
         gradient_penalty = self.calc_gradient_penalty(x,self.macro_data,ebd_y)
         wd_loss = fakeD.mean()-realD.mean()
         d_loss = wd_loss+gradient_penalty+self.opt.ALPHA*self.Lsloss(realDH,ebd_y)+self.opt.ALPHA*self.Lsloss(fakeDH,ebd_y)
@@ -196,7 +209,7 @@ class COCOGAN(object):
         self.d_losses.append(d_loss.item())
         #update G()
         self.G.zero_grad()
-        realG,realGH = self.D(self.macro_patches,ebd_y)#y有问题!
+        realG,realGH = self.D(self.macro_patches,ebd_y)
         wg_loss = -realG.mean()
         g_loss = wg_loss+self.opt.ALPHA*self.Lsloss(realGH,ebd_y)
         g_loss.backward()

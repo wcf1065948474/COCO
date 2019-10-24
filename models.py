@@ -12,8 +12,8 @@ class GeneratorResidualBlock(nn.Module):
     super().__init__()
     self.relu1 = nn.ReLU()
     self.relu2 = nn.ReLU()
-    self.upscale = nn.utils.spectral_norm(nn.ConvTranspose2d(input_channel, input_channel, 4, 2, 1))
-    self.upscale_branch = nn.utils.spectral_norm(nn.ConvTranspose2d(input_channel, input_channel, 4, 2, 1))
+    self.upscale = nn.Upsample(scale_factor=2)
+    self.upscale_branch = nn.Upsample(scale_factor=2)
     self.conv1 = nn.utils.spectral_norm(nn.Conv2d(input_channel,output_channel,3,padding=1))
     self.conv2 = nn.utils.spectral_norm(nn.Conv2d(output_channel,output_channel,3,padding=1))
     self.conv_branch = nn.utils.spectral_norm(nn.Conv2d(input_channel,output_channel,3,padding=1))
@@ -112,8 +112,9 @@ class Generator_withoutspectral(nn.Module):
 
 
 class DiscriminatorResidualBlock(nn.Module):
-  def __init__(self,input_channel,output_channel,pooling=True):
+  def __init__(self,input_channel,output_channel,pooling=True,is_head=False):
     super().__init__()
+    self.is_head = is_head
     self.pooling = pooling
     self.relu1 = nn.ReLU()
     self.relu2 = nn.ReLU()
@@ -125,7 +126,10 @@ class DiscriminatorResidualBlock(nn.Module):
       self.avg_pool_branch = nn.AvgPool2d(2,2)
 
   def forward(self,input):
-    master = self.relu1(input)
+    if not self.is_head:
+      master = self.relu1(input)
+    else:
+      master = input
     master = self.conv1(master)
     master = self.relu2(master)
     master = self.conv2(master)
@@ -140,7 +144,7 @@ class DiscriminatorResidualBlock(nn.Module):
 class Discriminator(nn.Module):
   def __init__(self,opt):
     super().__init__()
-    self.drb1 = DiscriminatorResidualBlock(3,opt.scale)
+    self.drb1 = DiscriminatorResidualBlock(3,opt.scale,is_head=True)
     self.drb2 = DiscriminatorResidualBlock(opt.scale,opt.scale*2)
     self.drb3 = DiscriminatorResidualBlock(opt.scale*2,opt.scale*4)
     self.drb4 = DiscriminatorResidualBlock(opt.scale*4,opt.scale*8)
@@ -150,9 +154,9 @@ class Discriminator(nn.Module):
     self.linear = nn.Linear(opt.scale*8,1)
     self.linear_branch = nn.Linear(2,opt.scale*8)
     self.dah = nn.Sequential(
-      nn.BatchNorm1d(opt.scale*8),
+      # nn.BatchNorm1d(opt.scale*8),
       nn.Linear(opt.scale*8,opt.scale*4),
-      nn.BatchNorm1d(opt.scale*4),
+      # nn.BatchNorm1d(opt.scale*4),
       nn.LeakyReLU(),
       nn.Linear(opt.scale*4,2),#1->28
       nn.Tanh()

@@ -1,7 +1,8 @@
 import torchvision.transforms as transforms
+from torch.utils.data import Dataset
 import h5py
 
-class CelebaDataset_h5py(object):
+class CelebaDataset_h5py(Dataset):
     def __init__(self,opt):
         self.opt = opt
         self.transform = transforms.Compose(

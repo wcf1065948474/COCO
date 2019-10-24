@@ -1,6 +1,6 @@
 import time
 
-def autotrain(start_epoch = 0,max_time = 3600*9,save_each_epoch = False):
+def autotrain(start_epoch = 0,max_time = 3600*9,save_each_epoch = True):
     def decorator(func):
         max_epochtime = 0
         rest_time = max_time
