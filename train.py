@@ -280,7 +280,7 @@ class COCOGAN(object):
                 img.save("gen_img//{}.jpg".format(self.generate_imgs_count))
         else:
             hwlist = []
-            plt.figure(figsize=(6,6))
+            plt.figure(figsize=(5,5))
             plt.axis('off')
             full_img = full_img[:16]
             imglist = np.split(full_img,full_img.shape[0])
