@@ -262,6 +262,7 @@ class COCOGAN(object):
         return full_img
 
     def generate_parallel(self,calc_fid = False,save_imgs = False):
+        self.G.eval()
         if calc_fid:
             imgs = []
             for i in range(100):
@@ -289,6 +290,7 @@ class COCOGAN(object):
             full_img = np.concatenate(hwlist,1)
             plt.imshow(full_img[0])
             plt.show()
+        self.G.train()
 
     
 
