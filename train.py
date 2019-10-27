@@ -199,6 +199,9 @@ class COCOGAN(object):
         fakeD,fakeDH = self.D(self.macro_data,ebd_y)
         realD,realDH = self.D(x,ebd_y)
         gradient_penalty = self.calc_gradient_penalty(x,self.macro_data,ebd_y)
+        # if self.opt.use_hinge:
+        #     wd_loss = nn.ReLU()(1.0-realD).mean()+nn.ReLU()(1.0+fakeD).mean()
+        # else:
         wd_loss = fakeD.mean()-realD.mean()
         d_loss = wd_loss+gradient_penalty+self.opt.ALPHA*self.Lsloss(realDH,ebd_y)+self.opt.ALPHA*self.Lsloss(fakeDH,ebd_y)
         d_loss.backward()
@@ -262,7 +265,6 @@ class COCOGAN(object):
         return full_img
 
     def generate_parallel(self,calc_fid = False,save_imgs = False):
-        self.G.eval()
         if calc_fid:
             imgs = []
             for i in range(100):
@@ -290,7 +292,6 @@ class COCOGAN(object):
             full_img = np.concatenate(hwlist,1)
             plt.imshow(full_img[0])
             plt.show()
-        self.G.train()
 
     
 
