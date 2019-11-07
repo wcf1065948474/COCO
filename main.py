@@ -5,6 +5,7 @@ import torch
 import models
 import time
 import utility
+import numpy as np
 torch.backends.cudnn.benchmark = True
 
 
@@ -26,9 +27,13 @@ def train_net(gan,dataloader):
     for real_macro_list in dataloader:
         real_macro_list = real_macro_list.cuda()
         gan.latent_ebdy_generator.get_latent()
-        for pos in range(9):
-            real_macro = get_macro_from_full(real_macro_list,pos)
-            gan.train_parallel(real_macro,pos)
+        d_poss = np.random.permutation(9)
+        g_poss = np.random.permutation(9)
+        for i in range(9):
+            d_pos = d_poss[i]
+            g_pos = g_poss[i]
+            real_macro = get_macro_from_full(real_macro_list,d_pos)
+            gan.train_parallel(real_macro,d_pos,g_pos)
     gan.generate_parallel()
     gan.show_loss()
 

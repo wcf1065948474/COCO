@@ -36,7 +36,7 @@ class Generator(nn.Module):
   def __init__(self,opt):
     super().__init__()
     self.opt = opt
-    self.linear = nn.Linear(opt.latentsize+opt.y_ebdsize,opt.latentoutsize)
+    self.linear = nn.utils.spectral_norm(nn.Linear(opt.latentsize+opt.y_ebdsize,opt.latentoutsize))
     self.grb1 = GeneratorResidualBlock(opt,opt.scale*16,opt.scale*8)
     self.grb2 = GeneratorResidualBlock(opt,opt.scale*8,opt.scale*4)
     self.grb3 = GeneratorResidualBlock(opt,opt.scale*4,opt.scale*2)
@@ -151,14 +151,14 @@ class Discriminator(nn.Module):
     self.drb5 = DiscriminatorResidualBlock(opt.scale*8,opt.scale*8,False)
     self.relu = nn.ReLU()
     self.glb_pool = nn.AdaptiveMaxPool2d(1)
-    self.linear = nn.Linear(opt.scale*8,1)
-    self.linear_branch = nn.Linear(2,opt.scale*8)
+    self.linear = nn.utils.spectral_norm(nn.Linear(opt.scale*8,1))
+    self.linear_branch = nn.utils.spectral_norm(nn.Linear(2,opt.scale*8))
     self.dah = nn.Sequential(
-      # nn.BatchNorm1d(opt.scale*8),
-      nn.Linear(opt.scale*8,opt.scale*4),
-      # nn.BatchNorm1d(opt.scale*4),
+      nn.BatchNorm1d(opt.scale*8),
+      nn.utils.spectral_norm(nn.Linear(opt.scale*8,opt.scale*4)),
+      nn.BatchNorm1d(opt.scale*4),
       nn.LeakyReLU(),
-      nn.Linear(opt.scale*4,2),#1->28
+      nn.utils.spectral_norm(nn.Linear(opt.scale*4,2)),#1->28
       nn.Tanh()
     )
 
@@ -172,9 +172,12 @@ class Discriminator(nn.Module):
     master = self.glb_pool(master)
     master = torch.squeeze(master)
     h = self.dah(master)
-    projection = self.linear_branch(y)
-    projection = projection*master
-    projection = torch.mean(projection,1,True)
+    if y is not None:
+      projection = self.linear_branch(y)
+      projection *= master
+      projection = torch.mean(projection,1,True)
+    else:
+      projection = 0
     master = self.linear(master)
     return master+projection,h
 
