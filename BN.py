@@ -18,8 +18,8 @@ class _GBN(nn.Module):
         self.affine = affine
         self.track_running_stats = track_running_stats
         if self.affine:
-            self.weight = Parameter(torch.Tensor(num_features))
-            self.bias = Parameter(torch.Tensor(num_features))
+            self.weight = Parameter(torch.Tensor(self.opt.micro_in_macro,1,num_features,1,1))
+            self.bias = Parameter(torch.Tensor(self.opt.micro_in_macro,1,num_features,1,1))
         else:
             self.register_parameter('weight', None)
             self.register_parameter('bias', None)
@@ -47,8 +47,7 @@ class _GBN(nn.Module):
 
     def forward(self, input):
         self._check_input_dim(input)
-        N,C,_,_ = input.size()
-        output = self.g_b_n(input,self.running_mean,self.running_var,self.weight.expand(N,C),self.bias.expand(N,C))
+        output = self.g_b_n(input,self.running_mean,self.running_var,self.weight,self.bias)
         return output
 
     def extra_repr(self):
@@ -73,8 +72,8 @@ class _GBN(nn.Module):
             X_hat = (input-mean)/torch.sqrt(var+self.eps)
         else:
             X_hat = (input-running_mean)/torch.sqrt(running_var+self.eps)
-        X_hat = X_hat.view(N,C,H,W)
-        output = X_hat*weight.view(N,self.num_features,1,1)+beta.view(N,self.num_features,1,1)
+        X_hat = X_hat*weight+beta
+        output = X_hat.view(N,C,H,W)
         return output
 
 
@@ -88,6 +87,8 @@ class GCBN(_GBN):
     def __init__(self,opt,num_features):
         super(GCBN,self).__init__(opt,num_features,affine=False)
         self.num_features = num_features
+        self.G = self.opt.micro_in_macro
+        self.N = self.opt.batchsize
         inter_dim = 2*num_features
         self.gamma_mlp = nn.Sequential(
             nn.Linear(128,inter_dim),
@@ -103,6 +104,8 @@ class GCBN(_GBN):
         self._check_input_dim(input)
         delta_gamma = self.gamma_mlp(y)
         delta_beta = self.beta_mlp(y)
+        delta_gamma = delta_gamma.view(self.G,self.N,self.num_features,1,1)
+        delta_beta = delta_beta.view(self.G,self.N,self.num_features,1,1)
         output = self.g_b_n(input,self.running_mean,self.running_var,delta_gamma,delta_beta)
         return output
 

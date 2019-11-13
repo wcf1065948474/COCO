@@ -94,6 +94,7 @@ def get_activations(images, sess, batch_size=50, verbose=False):
         start = i*batch_size
         end = start + batch_size
         batch = images[start:end]
+        batch = batch.astype(np.float32)
         pred = sess.run(inception_layer, {'FID_Inception_Net/ExpandDims:0': batch})
         pred_arr[start:end] = pred.reshape(batch_size,-1)
     if verbose:
@@ -293,9 +294,9 @@ def _handle_path(path, sess, low_profile=False):
     return m, s
 
 def handle_array(array,sess):
-    x = array.astype(np.float32)
+    # x = array.astype(np.float32)
     m,s = calculate_activation_statistics(x,sess)
-    del x
+    # del x
     return m,s
 
 def calculate_fid_given_paths(paths, inception_path, low_profile=False):

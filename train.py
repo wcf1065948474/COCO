@@ -1,5 +1,6 @@
 import torch
 import torch.nn as nn
+import torch.multiprocessing as _mp
 import random
 import option
 import models
@@ -8,8 +9,17 @@ import numpy as np
 import matplotlib.pyplot as plt
 import pickle
 from PIL import Image
-import fid_utils.fid as fid
+mp = _mp.get_context('spawn')
 
+def func(model,q_in,q_out,grad_in,optimizer):
+  while True:
+    input = q_in.get()
+    output = model(input,input)
+    q_out.put(output.detach())
+    grad = grad_in.get()
+    optimizer.zero_grad()
+    output.backward(grad.cuda())
+    optimizer.step()
 
 def tensor2im(image_tensor, imtype=np.uint8):
     image_numpy = image_tensor.cpu().float().numpy()
@@ -79,7 +89,7 @@ class Get_Latent_Y(object):
 class COCOGAN(object):
     def __init__(self,opt):
         self.opt = opt
-        self.G = models.Generator(opt) if opt.withspectral else models.Generator_withoutspectral(opt)
+        self.G = models.Generator(opt)
         self.D = models.Discriminator(opt)
         self.Lsloss = torch.nn.MSELoss()
         self.optimizerG = torch.optim.Adam(self.G.parameters(),opt.g_lr,opt.g_betas)
@@ -94,8 +104,34 @@ class COCOGAN(object):
         self.G.apply(self.weights_init)
         self.D.apply(self.weights_init)
         self.latent_ebdy_generator = Get_Latent_Y(opt)
-
         self.generate_imgs_count = 0
+        if True:
+            self.G.share_memory()
+            self.processes = []
+            self.main_to_thread1 = mp.Queue(maxsize=1)
+            self.main_to_thread2 = mp.Queue(maxsize=1)
+            self.main_to_thread3 = mp.Queue(maxsize=1)
+            self.main_to_thread4 = mp.Queue(maxsize=1)
+            self.thread1_to_main = mp.Queue(maxsize=1)
+            self.thread2_to_main = mp.Queue(maxsize=1)
+            self.thread3_to_main = mp.Queue(maxsize=1)
+            self.thread4_to_main = mp.Queue(maxsize=1)
+            self.thread1_grad = mp.Queue(maxsize=1)
+            self.thread2_grad = mp.Queue(maxsize=1)
+            self.thread3_grad = mp.Queue(maxsize=1)
+            self.thread4_grad = mp.Queue(maxsize=1)
+            p1 = mp.Process(target=func,args=(self.G,self.main_to_thread1,self.thread1_to_main,self.thread1_grad,self.optimizerG))
+            p1.start()
+            self.processes.append(p1)
+            p2 = mp.Process(target=func,args=(self.G,self.main_to_thread2,self.thread2_to_main,self.thread2_grad,self.optimizerG))
+            p2.start()
+            self.processes.append(p2)
+            p3 = mp.Process(target=func,args=(self.G,self.main_to_thread3,self.thread3_to_main,self.thread3_grad,self.optimizerG))
+            p3.start()
+            self.processes.append(p3)
+            p4 = mp.Process(target=func,args=(self.G,self.main_to_thread4,self.thread4_to_main,self.thread4_grad,self.optimizerG))
+            p4.start()
+            self.processes.append(p4)
     def weights_init(self,m):
         classname = m.__class__.__name__
         if classname.find('Conv') != -1:
@@ -120,18 +156,19 @@ class COCOGAN(object):
         for j in range(hw):
             macrolist.append(torch.cat(micro[j*hw:j*hw+hw],3))
         return torch.cat(macrolist,2)
-    def calc_gradient_penalty(self,real_data,fake_data):#,ebd_y):
+    def calc_gradient_penalty(self,real_data,fake_data,ebd_y):
         alpha = torch.rand(self.opt.batchsize, 1,1,1)
         alpha = alpha.expand(real_data.size())
         alpha = alpha.cuda()
         # ebd_y.requires_grad_()
 
-        interpolates = alpha * real_data + ((1 - alpha) * fake_data)
+        differences = fake_data-real_data
+        interpolates = real_data + (alpha * differences)
 
         interpolates = interpolates.cuda()
         interpolates = torch.autograd.Variable(interpolates, requires_grad=True)
 
-        disc_interpolates,_ = self.D(interpolates,None)
+        disc_interpolates,_ = self.D(interpolates,ebd_y)
 
         gradients = torch.autograd.grad(outputs=disc_interpolates, inputs=interpolates,
                                     grad_outputs=torch.ones(disc_interpolates.size()).cuda(),
@@ -139,6 +176,54 @@ class COCOGAN(object):
 
         gradient_penalty = (gradients[0].norm(2,dim=1)-1)**2
         return gradient_penalty.mean()*self.opt.LAMBDA
+
+
+    def train_serial_multiprocesses(self,x,pos):
+        latent_ebdy,_ = self.latent_ebdy_generator.get_latent_ebdy(pos)
+        micro_patches = []
+        self.main_to_thread1.put(latent_ebdy[:self.opt.batchsize].cuda())
+        self.main_to_thread2.put(latent_ebdy[self.opt.batchsize:2*self.opt.batchsize].cuda())
+        self.main_to_thread3.put(latent_ebdy[2*self.opt.batchsize:3*self.opt.batchsize].cuda())
+        self.main_to_thread4.put(latent_ebdy[3*self.opt.batchsize:4*self.opt.batchsize].cuda())
+        micro_patches.append(self.thread1_to_main.get())
+        micro_patches.append(self.thread2_to_main.get())
+        micro_patches.append(self.thread3_to_main.get())
+        micro_patches.append(self.thread4_to_main.get())
+
+        self.macro_patches = self.macro_from_micro_serial(micro_patches)
+        #update D()
+        x = x.cuda()
+        ebd_y = self.latent_ebdy_generator.get_ebdy(pos,'macro')
+        ebd_y = ebd_y.cuda()
+        self.D.zero_grad()
+        fakeD,fakeDH = self.D(self.macro_patches,ebd_y)
+        realD,realDH = self.D(x,ebd_y)
+        gradient_penalty = self.calc_gradient_penalty(x,self.macro_patches,ebd_y)
+        wd_loss = fakeD.mean()-realD.mean()
+        d_loss = wd_loss+gradient_penalty+self.opt.ALPHA*self.Lsloss(realDH,ebd_y)+self.opt.ALPHA*self.Lsloss(fakeDH,ebd_y)
+        d_loss.backward()
+        # if self.opt.showgrad:
+        #     plot_grad_flow(self.D.named_parameters())
+        self.optimizerD.step()
+        self.d_losses.append(d_loss.item())
+        self.wd_losses.append(wd_loss.item())
+        # #update G()
+        self.macro_patches.requires_grad=True
+        self.D.zero_grad()
+        realG,realGH = self.D(self.macro_patches,ebd_y)
+        wg_loss = -realG.mean()
+        g_loss = wg_loss+self.opt.ALPHA*self.Lsloss(realGH,ebd_y)
+        g_loss.backward()
+        
+        backgrad_g = self.macro_patches.grad.cpu()
+        self.thread1_grad.put(backgrad_g[:,:,:16,:16])
+        self.thread2_grad.put(backgrad_g[:,:,:16,16:32])
+        self.thread3_grad.put(backgrad_g[:,:,16:32,:16])
+        self.thread4_grad.put(backgrad_g[:,:,16:32,16:32])
+        # if self.opt.showgrad:
+        #     plot_grad_flow(self.G.named_parameters())
+        self.g_losses.append(g_loss.item())
+        self.wg_losses.append(wg_loss.item())
 
     def train_serial(self,x,pos):
         latent_ebdy,_ = self.latent_ebdy_generator.get_latent_ebdy(pos)
@@ -154,24 +239,28 @@ class COCOGAN(object):
         ebd_y = ebd_y.cuda()
         self.D.zero_grad()
         self.macro_data = self.macro_patches.detach()
-        fakeD,fakeDH = self.D(self.macro_data,ebd_y)#y有问题！
-        realD,realDH = self.D(x,ebd_y)#y有问题！
+        fakeD,fakeDH = self.D(self.macro_data,ebd_y)
+        realD,realDH = self.D(x,ebd_y)
         gradient_penalty = self.calc_gradient_penalty(x,self.macro_data,ebd_y)
-        d_loss = fakeD.mean()-realD.mean()+gradient_penalty+self.opt.ALPHA*self.Lsloss(realDH,ebd_y)+self.opt.ALPHA*self.Lsloss(fakeDH,ebd_y)
+        wd_loss = fakeD.mean()-realD.mean()
+        d_loss = wd_loss+gradient_penalty+self.opt.ALPHA*self.Lsloss(realDH,ebd_y)+self.opt.ALPHA*self.Lsloss(fakeDH,ebd_y)
         d_loss.backward()
         if self.opt.showgrad:
             plot_grad_flow(self.D.named_parameters())
         self.optimizerD.step()
         self.d_losses.append(d_loss.item())
+        self.wd_losses.append(wd_loss.item())
         #update G()
         self.G.zero_grad()
-        realG,realGH = self.D(self.macro_patches,ebd_y)#y有问题!
-        g_loss = -realG.mean()+self.opt.ALPHA*self.Lsloss(realGH,ebd_y)
+        realG,realGH = self.D(self.macro_patches,ebd_y)
+        wg_loss = -realG.mean()
+        g_loss = wg_loss+self.opt.ALPHA*self.Lsloss(realGH,ebd_y)
         g_loss.backward()
         if self.opt.showgrad:
             plot_grad_flow(self.G.named_parameters())
         self.optimizerG.step()
         self.g_losses.append(g_loss.item())
+        self.wg_losses.append(wg_loss.item())
 
     def swap_imgs(self,real_imgs,fake_imgs,uratio=0.3,ratio=0.1):
         up = random.uniform(0,1)
@@ -183,29 +272,25 @@ class COCOGAN(object):
                     real_imgs[idx] = fake_imgs[idx].clone()
                     fake_imgs[idx] = tmp
 
-    def train_parallel(self,x,d_pos,g_pos):
-        latent_ebdy,_ = self.latent_ebdy_generator.get_latent_ebdy(g_pos)
+    def train_parallel(self,x,pos):
+        latent_ebdy,_ = self.latent_ebdy_generator.get_latent_ebdy(pos)
         latent_ebdy = latent_ebdy.cuda()
         micro_patches = self.G(latent_ebdy,latent_ebdy)
         self.macro_patches = self.macro_from_micro_parallel(micro_patches)
 
         #update D()
-        # x = x.cuda()
-        g_ebd_y = self.latent_ebdy_generator.get_ebdy(g_pos,'macro')
-        g_ebd_y = g_ebd_y.cuda()
-        d_ebd_y = self.latent_ebdy_generator.get_ebdy(d_pos,'macro')
-        d_ebd_y = d_ebd_y.cuda()
+        x = x.cuda()
+        ebd_y = self.latent_ebdy_generator.get_ebdy(pos,'macro')
+        ebd_y = ebd_y.cuda()
         self.D.zero_grad()
         self.macro_data = self.macro_patches.detach().clone()
-        # self.swap_imgs(x,self.macro_data)
-        fakeD,fakeDH = self.D(self.macro_data,g_ebd_y)
-        realD,realDH = self.D(x,d_ebd_y)
-        gradient_penalty = self.calc_gradient_penalty(x,self.macro_data)#,ebd_y)
-        # if self.opt.use_hinge:
-        #     wd_loss = nn.ReLU()(1.0-realD).mean()+nn.ReLU()(1.0+fakeD).mean()
-        # else:
+
+        fakeD,fakeDH = self.D(self.macro_data,ebd_y)
+        realD,realDH = self.D(x,ebd_y)
+        gradient_penalty = self.calc_gradient_penalty(x,self.macro_data,ebd_y)
+
         wd_loss = fakeD.mean()-realD.mean()
-        d_loss = wd_loss+gradient_penalty+self.opt.ALPHA*self.Lsloss(realDH,d_ebd_y)+self.opt.ALPHA*self.Lsloss(fakeDH,g_ebd_y)
+        d_loss = wd_loss+gradient_penalty+self.opt.ALPHA*self.Lsloss(realDH,ebd_y)+self.opt.ALPHA*self.Lsloss(fakeDH,ebd_y)
         d_loss.backward()
         if self.opt.showgrad:
             plot_grad_flow(self.D.named_parameters())
@@ -214,9 +299,9 @@ class COCOGAN(object):
         self.d_losses.append(d_loss.item())
         #update G()
         self.G.zero_grad()
-        realG,realGH = self.D(self.macro_patches,g_ebd_y)
+        realG,realGH = self.D(self.macro_patches,ebd_y)
         wg_loss = -realG.mean()
-        g_loss = wg_loss+self.opt.ALPHA*self.Lsloss(realGH,g_ebd_y)
+        g_loss = wg_loss+self.opt.ALPHA*self.Lsloss(realGH,ebd_y)
         g_loss.backward()
         if self.opt.showgrad:
             plot_grad_flow(self.G.named_parameters())
