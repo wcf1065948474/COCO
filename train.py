@@ -105,7 +105,7 @@ class COCOGAN(object):
         self.D.apply(self.weights_init)
         self.latent_ebdy_generator = Get_Latent_Y(opt)
         self.generate_imgs_count = 0
-        if True:
+        if False:
             self.G.share_memory()
             self.processes = []
             self.main_to_thread1 = mp.Queue(maxsize=1)
