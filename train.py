@@ -1,6 +1,6 @@
 import torch
 import torch.nn as nn
-import torch.multiprocessing as _mp
+# import torch.multiprocessing as _mp
 import random
 import option
 import models
@@ -9,7 +9,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import pickle
 from PIL import Image
-mp = _mp.get_context('spawn')
+# mp = _mp.get_context('spawn')
 
 def func(model,q_in,q_out,grad_in,optimizer):
   while True:
