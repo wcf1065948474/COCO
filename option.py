@@ -1,9 +1,9 @@
 class Option(object):
     def __init__(self):
-        self.batchsize = 512
+        self.batchsize = 256
         self.latentsize = 100
         self.y_ebdsize = 28
-        self.scale = 32
+        self.scale = 64
         self.latentoutsize = self.scale*16*2*2
         self.num_classes = 16
         self.micro_in_macro = 4
@@ -16,10 +16,10 @@ class Option(object):
         self.LAMBDA = 10
         self.ALPHA = 100
         self.epoch = 50
-        self.max_dataset = 50000
+        self.max_dataset = 202599
         self.my_model_dir = 'my_model'
         self.showgrad = False
         self.g_lr = 1e-4
-        self.d_lr = 4e-4
+        self.d_lr = 2e-4
         self.g_betas = (0.0,0.999)
         self.d_betas = (0.0,0.999)
