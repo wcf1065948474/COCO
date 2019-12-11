@@ -61,11 +61,11 @@ def tensor2im(image_tensor, imtype=np.uint8):
 
 
 class PatchCOCOGAN(object):
-    def __init__(self):
+    def __init__(self,opt):
         self.opt = opt
         self.G_img    = models.Generator(opt)
         self.D_img    = models.Discriminator(opt)
-        self.G_latent = models.ImgToLatentDiscriminator(opt)
+        self.G_latent = models.ImgToLatentGenerator(opt)
         self.D_latent = models.ImgToLatentDiscriminator()
         self.G_img_opt    = torch.optim.Adam(self.G_img.parameters(),opt.g_lr,opt.g_betas)
         self.D_img_opt    = torch.optim.Adam(self.D_img.parameters(),opt.d_lr,opt.d_betas)
@@ -124,7 +124,7 @@ class PatchCOCOGAN(object):
         #update G_latent()
         self.G_latent.zero_grad()
         predict_latent,predict_pos = self.G_latent(self.macro_data)
-        g_latent_loss = self.mseloss(predict_latent,latent_ebdy[:,:126])+self.mseloss(predict_pos,ebd_y)
+        g_latent_loss = self.mseloss(predict_latent,latent_ebdy[:self.opt.batchsize,:126])+self.mseloss(predict_pos,ebd_y)
         g_latent_loss.backward()
         self.G_latent_opt.step()
         #update G_img()
@@ -143,7 +143,7 @@ class PatchCOCOGAN(object):
         fake_latent,fake_pos = self.G_latent(x)
         fake_latent_clone = fake_latent.detach().clone()
         fakeDLatent = self.D_latent(fake_latent_clone)
-        realDLatent = self.D_latent(latent_ebdy[:,:126])
+        realDLatent = self.D_latent(latent_ebdy[:self.opt.batchsize,:126])
         wdlatent_loss = fakeDLatent.mean()-realDLatent.mean()
         wdlatent_loss.backward()
         self.D_latent_opt.step()
@@ -151,8 +151,10 @@ class PatchCOCOGAN(object):
         self.G_img.zero_grad()
         micro_ebd_y = self.latent_ebdy_generator.get_ebdy(pos)
         micro_ebd_y = micro_ebd_y.cuda()
+        fake_latent_clone = fake_latent_clone.repeat((self.opt.micro_in_macro,1))
         fake_latent_cat = torch.cat((fake_latent_clone,micro_ebd_y),1)
         fakeimg = self.G_img(fake_latent_cat,fake_latent_cat)
+        fakeimg = self.macro_from_micro_parallel(fakeimg)
         g_img_loss = self.mseloss(fakeimg,x)
         g_img_loss.backward()
         self.G_img_opt.step()
@@ -180,6 +182,9 @@ class PatchCOCOGAN(object):
             tmp_list.append(torch.cat(macro_patches_list[i*hw:i*hw+hw],3))
         full_img = torch.cat(tmp_list,2)
         full_img = tensor2im(full_img)
-        return full_img
+
+        for i in range(self.opt.batchsize):
+            img = Image.fromarray(full_img[i])
+            img.save("gen_img//{}.jpg".format(i))
                 
 

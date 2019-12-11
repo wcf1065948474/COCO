@@ -156,7 +156,7 @@ class ImgToLatentGenerator(nn.Module):
       nn.Tanh()
     )
   def forward(self,x):
-    master = self.grb1(input)
+    master = self.grb1(x)
     master = self.grb2(master)
     master = self.grb3(master)
     master = self.grb4(master)
