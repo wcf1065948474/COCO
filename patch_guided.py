@@ -167,15 +167,16 @@ class PatchCOCOGAN(object):
 
     def predict(self,x):
         pos_list = [0,2,6,8]
-        latent = self.G_latent(x)
+        latent,_ = self.G_latent(x)
         macro_patches_list = []
         hw = int(np.sqrt(self.opt.macro_in_full))
         with torch.no_grad():
             for pos in pos_list:
                 micro_ebd_y = self.latent_ebdy_generator.get_ebdy(pos)
                 micro_ebd_y = micro_ebd_y.cuda()
-                latent_y = torch.cat((latent,micro_ebd_y),1)
-                micro_patches = self.G_img(latent_y)
+                latent_tmp = latent.repeat((self.opt.micro_in_macro,1))
+                latent_y = torch.cat((latent_tmp,micro_ebd_y),1)
+                micro_patches = self.G_img(latent_y,latent_y)
                 macro_patches_list.append(self.macro_from_micro_parallel(micro_patches))
         tmp_list = []
         for i in range(hw):
@@ -187,4 +188,31 @@ class PatchCOCOGAN(object):
             img = Image.fromarray(full_img[i])
             img.save("gen_img//{}.jpg".format(i))
                 
+    def save_network(self,epoch_label):
+        save_filename = "%s_netG_img.pth"%epoch_label
+        save_path = os.path.join(self.opt.my_model_dir,save_filename)
+        torch.save(self.G_img.state_dict(),save_path)
+        save_filename = "%s_netD_img.pth"%epoch_label
+        save_path = os.path.join(self.opt.my_model_dir,save_filename)
+        torch.save(self.D_img.state_dict(),save_path)
+        save_filename = "%s_netG_latent.pth"%epoch_label
+        save_path = os.path.join(self.opt.my_model_dir,save_filename)
+        torch.save(self.G_latent.state_dict(),save_path)
+        save_filename = "%s_netD_latent.pth"%epoch_label
+        save_path = os.path.join(self.opt.my_model_dir,save_filename)
+        torch.save(self.D_latent.state_dict(),save_path)
 
+
+    def load_network(self,epoch_label):
+        filename = "%s_netG_img.pth"%epoch_label
+        filepath = os.path.join(self.opt.my_model_dir,filename)
+        self.G_img.load_state_dict(torch.load(filepath))
+        filename = "%s_netD_img.pth"%epoch_label
+        filepath = os.path.join(self.opt.my_model_dir,filename)
+        self.D_img.load_state_dict(torch.load(filepath))
+        filename = "%s_netG_latent.pth"%epoch_label
+        filepath = os.path.join(self.opt.my_model_dir,filename)
+        self.G_latent.load_state_dict(torch.load(filepath))
+        filename = "%s_netD_latent.pth"%epoch_label
+        filepath = os.path.join(self.opt.my_model_dir,filename)
+        self.D_latent.load_state_dict(torch.load(filepath))
