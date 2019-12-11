@@ -285,12 +285,15 @@ class COCOGAN(object):
         self.D.zero_grad()
         self.macro_data = self.macro_patches.detach().clone()
 
-        fakeD,fakeDH = self.D(self.macro_data,ebd_y)
-        realD,realDH = self.D(x,ebd_y)
+        fakeD,fakeDH,fakeDQ = self.D(self.macro_data,ebd_y)
+        realD,realDH,realDQ = self.D(x,ebd_y)
         gradient_penalty = self.calc_gradient_penalty(x,self.macro_data,ebd_y)
 
         wd_loss = fakeD.mean()-realD.mean()
         d_loss = wd_loss+gradient_penalty+self.opt.ALPHA*self.Lsloss(realDH,ebd_y)+self.opt.ALPHA*self.Lsloss(fakeDH,ebd_y)
+        if self.opt.predict_content:
+            d_loss += self.opt.ALPHA*self.Lsloss(fakeDQ,latent_ebdy[:self.opt.batchsize,:126])
+            d_loss += self.opt.ALPHA*self.Lsloss(realDQ,latent_ebdy[:self.opt.batchsize,:126])
         d_loss.backward()
         if self.opt.showgrad:
             plot_grad_flow(self.D.named_parameters())
@@ -299,9 +302,11 @@ class COCOGAN(object):
         self.d_losses.append(d_loss.item())
         #update G()
         self.G.zero_grad()
-        realG,realGH = self.D(self.macro_patches,ebd_y)
+        realG,realGH,realGQ = self.D(self.macro_patches,ebd_y)
         wg_loss = -realG.mean()
         g_loss = wg_loss+self.opt.ALPHA*self.Lsloss(realGH,ebd_y)
+        if self.opt.predict_content:
+            g_loss += self.Lsloss(realGQ,ebd_y[:self.opt.batchsize,:126])
         g_loss.backward()
         if self.opt.showgrad:
             plot_grad_flow(self.G.named_parameters())

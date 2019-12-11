@@ -100,6 +100,7 @@ class DiscriminatorResidualBlock(nn.Module):
 class Discriminator(nn.Module):
   def __init__(self,opt):
     super().__init__()
+    self.opt = opt
     self.drb1 = DiscriminatorResidualBlock(3,opt.scale,k=32,is_head=True)
     self.drb2 = DiscriminatorResidualBlock(opt.scale,opt.scale*2,k=16)
     self.drb3 = DiscriminatorResidualBlock(opt.scale*2,opt.scale*4,k=8)
@@ -117,6 +118,15 @@ class Discriminator(nn.Module):
       nn.Linear(opt.scale*4,2),#1->28
       nn.Tanh()
     )
+    if opt.predict_content:
+      self.daq =  nn.Sequential(
+        nn.LayerNorm(opt.scale*8),
+        nn.Linear(opt.scale*8,opt.scale*4),
+        nn.LayerNorm(opt.scale*4),
+        nn.LeakyReLU(),
+        nn.Linear(opt.scale*4,126),#1->28
+        nn.Tanh()
+      )
 
   def forward(self,input,y):
     master = self.drb1(input)
@@ -128,75 +138,12 @@ class Discriminator(nn.Module):
     master = self.glb_pool(master)
     master = torch.squeeze(master)
     h = self.dah(master)
+    if self.opt.predict_content:
+      q = self.daq(master)
+    else:
+      q = None
     projection = self.linear_branch(y)
     projection *= master
     projection = torch.mean(projection,1,True)
     master = self.linear(master)
-    return master+projection,h
-
-
-##########################################################################
-class ImgToLatentGenerator(nn.Module):
-  def __init__(self,opt):
-    super().__init__()
-    self.grb1 = DiscriminatorResidualBlock(3,opt.scale,k=32,is_head=True)
-    self.grb2 = DiscriminatorResidualBlock(opt.scale,opt.scale*2,k=16)
-    self.grb3 = DiscriminatorResidualBlock(opt.scale*2,opt.scale*4,k=8)
-    self.grb4 = DiscriminatorResidualBlock(opt.scale*4,opt.scale*8,k=4)
-    self.grb5 = DiscriminatorResidualBlock(opt.scale*8,opt.scale*8,k=2,pooling=False)
-    self.relu = nn.ReLU()
-    self.glb_pool = nn.AdaptiveMaxPool2d(1)
-    self.linear = nn.Linear(opt.scale*8,126)
-    self.dah = nn.Sequential(
-      nn.LayerNorm(opt.scale*8),
-      nn.Linear(opt.scale*8,opt.scale*4),
-      nn.LayerNorm(opt.scale*4),
-      nn.LeakyReLU(),
-      nn.Linear(opt.scale*4,2),#1->28
-      nn.Tanh()
-    )
-  def forward(self,x):
-    master = self.grb1(x)
-    master = self.grb2(master)
-    master = self.grb3(master)
-    master = self.grb4(master)
-    master = self.grb5(master)
-    master = self.relu(master)
-    master = self.glb_pool(master)
-    master = torch.squeeze(master)
-    h = self.dah(master)
-    master = self.linear(master)
-    return master,h
-
-class ImgToLatentDiscriminator(nn.Module):
-  def __init__(self):
-    super().__init__()
-    self.linear1 = nn.Linear(126,64)
-    self.linear2 = nn.Linear(64,32)
-    self.linear3 = nn.Linear(32,16)
-    self.linear4 = nn.Linear(16,8)
-    self.linear5 = nn.Linear(8,1)
-    self.bn1 = nn.BatchNorm1d(64)
-    self.bn2 = nn.BatchNorm1d(32)
-    self.bn3 = nn.BatchNorm1d(16)
-    self.bn4 = nn.BatchNorm1d(8)
-    self.relu1 = nn.ReLU()
-    self.relu2 = nn.ReLU()
-    self.relu3 = nn.ReLU()
-    self.relu4 = nn.ReLU()
-    self.tanh = nn.Tanh()
-  def forward(self,x):
-    master = self.linear1(x)
-    master = self.bn1(master)
-    master = self.relu1(master)
-    master = self.linear2(master)
-    master = self.bn2(master)
-    master = self.relu2(master)
-    master = self.linear3(master)
-    master = self.bn3(master)
-    master = self.relu3(master)
-    master = self.linear4(master)
-    master = self.bn4(master)
-    master = self.relu4(master)
-    master = self.linear5(master)
-    return self.tanh(master)
+    return master+projection,h,q

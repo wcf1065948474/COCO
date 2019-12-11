@@ -23,3 +23,4 @@ class Option(object):
         self.d_lr = 2e-4
         self.g_betas = (0.0,0.999)
         self.d_betas = (0.0,0.999)
+        self.predict_content = False
