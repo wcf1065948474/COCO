@@ -306,7 +306,7 @@ class COCOGAN(object):
         wg_loss = -realG.mean()
         g_loss = wg_loss+self.opt.ALPHA*self.Lsloss(realGH,ebd_y)
         if self.opt.predict_content:
-            g_loss += self.Lsloss(realGQ,ebd_y[:self.opt.batchsize,:126])
+            g_loss += self.Lsloss(realGQ,latent_ebdy[:self.opt.batchsize,:126])
         g_loss.backward()
         if self.opt.showgrad:
             plot_grad_flow(self.G.named_parameters())
