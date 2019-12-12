@@ -77,6 +77,26 @@ class Get_Latent_Y(object):
         self.z = torch.from_numpy(self.z)
         self.latent = torch.cat((self.z,self.ebd),1)
 
+class Get_Latent_Y_extra(object):
+    def __init__(self,opt):
+        self.opt = opt
+        x = torch.linspace(-2.3333,2.3333,8))
+        x = x.view(1,-1)
+        x = x.expand(8,-1)
+        y = torch.linspace(-2.3333,2.3333,8))
+        y = y.view(-1,1)
+        y = y.expand(-1,8)
+        self.ebd = torch.stack((x,y),0)
+        self.ebd = self.ebd.view(2,-1)
+        self.ebd = torch.transpose(self.ebd,0,1)
+        self.ebd = np.repeat(self.ebd,self.opt.batchsize,0)
+    def get_latent(self):
+        # self.z = np.random.normal(0.0,1.0,(self.opt.batchsize,126)).astype(np.float32)
+        self.z = np.random.uniform(-1.,1.,(self.opt.batchsize,126)).astype(np.float32)
+        self.z = np.tile(self.z,(64,1))
+        self.z = torch.from_numpy(self.z)
+        self.latent = torch.cat((self.z,self.ebd),1)
+
 class Evaluate(object):
     def __init__(self,opt):
         self.opt = opt

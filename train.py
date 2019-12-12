@@ -168,7 +168,7 @@ class COCOGAN(object):
         interpolates = interpolates.cuda()
         interpolates = torch.autograd.Variable(interpolates, requires_grad=True)
 
-        disc_interpolates,_ = self.D(interpolates,ebd_y)
+        disc_interpolates,_,_ = self.D(interpolates,ebd_y)
 
         gradients = torch.autograd.grad(outputs=disc_interpolates, inputs=interpolates,
                                     grad_outputs=torch.ones(disc_interpolates.size()).cuda(),
